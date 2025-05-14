@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:smart_hotel_app/router/router.dart';
 
-void main() {
-  runApp(const MainApp());
+void main() async {
+  runApp(const HotelApp());
 }
 
-class MainApp extends StatelessWidget {
-  const MainApp({super.key});
+class HotelApp extends StatelessWidget {
+  const HotelApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      home: Scaffold(
-        body: Center(
-          child: Text('Hello World!'),
-        ),
-      ),
+    final router = AppRouter();
+
+    return MaterialApp.router(
+      routerConfig: router.config(),
+      theme: ThemeData(fontFamily: 'Geist'),
     );
   }
 }
