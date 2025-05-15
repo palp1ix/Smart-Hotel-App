@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:smart_hotel_app/core/colors/colors.dart';
 import 'package:smart_hotel_app/router/router.dart';
 
 void main() async {
@@ -14,7 +15,10 @@ class HotelApp extends StatelessWidget {
 
     return MaterialApp.router(
       routerConfig: router.config(),
-      theme: ThemeData(fontFamily: 'Geist'),
+      theme: ThemeData(
+        fontFamily: 'Geist',
+        colorScheme: ColorScheme.dark(surface: AppColors.background),
+      ),
     );
   }
 }
