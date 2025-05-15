@@ -2,6 +2,7 @@ import 'package:auto_route/annotations.dart';
 import 'package:flutter/material.dart';
 import 'package:smart_hotel_app/core/colors/colors.dart';
 import 'package:smart_hotel_app/core/icons/icons.dart';
+import 'package:smart_hotel_app/core/widgets/hotel_button_container.dart';
 import 'package:smart_hotel_app/core/widgets/hotel_icon_switch.dart';
 import 'package:smart_hotel_app/core/widgets/hotel_primary_button.dart';
 import 'package:smart_hotel_app/core/widgets/hotel_slider.dart';
@@ -26,6 +27,12 @@ class _LoginScreenState extends State<LoginScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            HotelButtonContainer(
+              width: 114,
+              height: 81,
+              iconPath: 'assets/icons/heart.svg',
+              text: 'Romantic',
+            ),
             HotelIconSwitch(
               onSelect: () {
                 print('Hui, chlen');

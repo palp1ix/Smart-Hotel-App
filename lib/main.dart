@@ -14,6 +14,7 @@ class HotelApp extends StatelessWidget {
     final router = AppRouter();
 
     return MaterialApp.router(
+      debugShowCheckedModeBanner: false,
       routerConfig: router.config(),
       theme: ThemeData(
         fontFamily: 'Geist',
