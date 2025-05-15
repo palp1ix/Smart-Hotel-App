@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:smart_hotel_app/core/colors/colors.dart';
 import 'package:smart_hotel_app/core/icons/icons.dart';
 import 'package:smart_hotel_app/core/widgets/hotel_primary_button.dart';
+import 'package:smart_hotel_app/core/widgets/hotel_text_button.dart';
 import 'package:smart_hotel_app/core/widgets/hotel_text_field.dart';
 
 @RoutePage()
@@ -40,6 +41,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
             HotelPrimaryButton(title: 'Login', color: AppColors.main),
+            HotelTextButton(onPressed: () {}, text: 'Some text'),
           ],
         ),
       ),
