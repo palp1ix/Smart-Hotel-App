@@ -23,10 +23,21 @@ class _LoginScreenState extends State<LoginScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            HotelTextField(
-              controller: controller,
-              hintText: 'Email',
-              prefixIconPath: AppIcons.key,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: HotelTextField(
+                controller: controller,
+                hintText: 'Email',
+                prefixIconPath: AppIcons.atSymbol,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: HotelTextField(
+                controller: controller,
+                hintText: 'Password',
+                prefixIconPath: AppIcons.key,
+              ),
             ),
             HotelPrimaryButton(title: 'Login', color: AppColors.main),
           ],
