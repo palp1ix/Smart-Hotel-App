@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:smart_hotel_app/core/colors/colors.dart';
 import 'package:smart_hotel_app/core/icons/icons.dart';
 import 'package:smart_hotel_app/core/widgets/hotel_primary_button.dart';
+import 'package:smart_hotel_app/core/widgets/hotel_slider.dart';
 import 'package:smart_hotel_app/core/widgets/hotel_text_button.dart';
 import 'package:smart_hotel_app/core/widgets/hotel_text_field.dart';
 
@@ -24,6 +25,7 @@ class _LoginScreenState extends State<LoginScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            HotelSlider(iconPath: 'assets/icons/sun.svg'),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: HotelTextField(
@@ -32,6 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 prefixIconPath: AppIcons.atSymbol,
               ),
             ),
+            SizedBox(height: 10),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: HotelTextField(
@@ -40,6 +43,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 prefixIconPath: AppIcons.key,
               ),
             ),
+            SizedBox(height: 20),
             HotelPrimaryButton(title: 'Login', color: AppColors.main),
             HotelTextButton(onPressed: () {}, text: 'Some text'),
           ],
