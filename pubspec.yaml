@@ -10,8 +10,11 @@ dependencies:
   auto_route: ^10.0.1
   flutter:
     sdk: flutter
+  # State managment
   flutter_bloc: ^9.1.1
+  # Work with bluetooth
   flutter_blue_plus: ^1.35.5
+  # Work with svg icons
   flutter_svg: ^2.1.0
 
 dev_dependencies:
