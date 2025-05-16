@@ -41,6 +41,7 @@ class BlueManager {
         final completer = Completer<BluetoothDevice>();
         final subscription = FlutterBluePlus.onScanResults.listen((results) {
           for (final result in results) {
+            log('Found device: ${result.device.advName}');
             if (result.device.advName == deviceName) {
               FlutterBluePlus.stopScan();
               completer.complete(result.device);
@@ -80,6 +81,14 @@ class BlueManager {
       services = await device.discoverServices().timeout(
         const Duration(seconds: 10),
       );
+
+      // TODO: Delete test logic!
+      services.forEach((service) {
+        log('Discovered service: ${service.uuid}');
+        service.characteristics.forEach((characteristic) {
+          log('Characteristic: ${characteristic.uuid}');
+        });
+      });
     } catch (e) {
       log('Error discovering services: $e');
       await device.disconnect();

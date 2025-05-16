@@ -6,7 +6,7 @@ import 'package:smart_hotel_app/router/router.dart';
 void main() async {
   runApp(const HotelApp());
   final blueManager = BlueManager(
-    deviceName: "Time",
+    deviceName: "ROOM_18",
     serviceUuid: "1807",
     characteristicUuid: "2A11",
   );

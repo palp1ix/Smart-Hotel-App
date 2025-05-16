@@ -8,11 +8,13 @@ class HotelTextField extends StatefulWidget {
     required this.controller,
     required this.hintText,
     this.prefixIconPath,
+    this.obscureText = false,
   });
 
   final TextEditingController controller;
   final String hintText;
   final String? prefixIconPath;
+  final bool obscureText;
 
   @override
   State<HotelTextField> createState() => _HotelTextFieldState();
@@ -27,6 +29,7 @@ class _HotelTextFieldState extends State<HotelTextField> {
       constraints: BoxConstraints(maxHeight: 60),
       child: TextField(
         controller: widget.controller,
+        obscureText: widget.obscureText,
         cursorColor: Color(0xFF3E5854),
         cursorWidth: 3,
         style: TextStyle(

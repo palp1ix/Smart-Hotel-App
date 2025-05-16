@@ -19,10 +19,11 @@ class HotelTextButton extends StatelessWidget {
       onPressed: onPressed,
       style: ButtonStyle(
         foregroundColor: WidgetStatePropertyAll(textColor ?? AppColors.main),
+        overlayColor: WidgetStatePropertyAll(Colors.transparent),
       ),
       child: Text(
         text,
-        style: TextStyle(fontVariations: [FontVariation('wght', 500)]),
+        style: TextStyle(fontVariations: [FontVariation('wght', 600)]),
       ),
     );
   }

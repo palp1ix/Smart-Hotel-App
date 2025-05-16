@@ -8,32 +8,37 @@ class HotelPrimaryButton extends StatelessWidget {
     required this.title,
     this.color,
     this.icon,
+    required this.onPressed,
   });
 
   final String title;
   final Color? color;
   final Widget? icon;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: color ?? AppColors.main,
-        borderRadius: BorderRadius.circular(25),
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        decoration: BoxDecoration(
+          color: color ?? AppColors.main,
+          borderRadius: BorderRadius.circular(25),
+        ),
+        height: 52,
+        width: double.infinity,
+        child: icon != null ? _buildWithIcon() : _buildWithoutIcon(),
       ),
-      height: 52,
-      width: double.infinity,
-      margin: EdgeInsets.symmetric(horizontal: 31),
-      child: icon != null ? _buildWithIcon() : _buildWithoutIcon(),
     );
   }
 
   Widget _buildWithIcon() {
     return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
         icon!,
-        SizedBox(width: 5),
-        getGeistText(title, weight: 700, size: 16),
+        SizedBox(width: 10),
+        getGeistText(title, weight: 500, size: 16),
       ],
     );
   }
