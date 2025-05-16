@@ -10,8 +10,14 @@ class HotelButtonContainer extends StatefulWidget {
     required this.height,
     required this.iconPath,
     required this.text,
+    required this.isSelected,
+    required this.onTap,
+    required this.index,
   });
 
+  final int index;
+  final bool isSelected;
+  final Function(int) onTap;
   final double width;
   final double height;
   final String iconPath;
@@ -22,15 +28,12 @@ class HotelButtonContainer extends StatefulWidget {
 }
 
 class _HotelButtonContainerState extends State<HotelButtonContainer> {
-  bool isSelected = false;
   @override
   Widget build(BuildContext context) {
+    bool isSelected = widget.isSelected;
+
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          isSelected = !isSelected;
-        });
-      },
+      onTap: () => widget.onTap(widget.index),
       child: AnimatedContainer(
         width: widget.width,
         height: widget.height,

@@ -16,6 +16,7 @@ dependencies:
   flutter_blue_plus: ^1.35.5
   # Work with svg icons
   flutter_svg: ^2.1.0
+  grpc: ^4.0.4
 
 dev_dependencies:
   flutter_test:

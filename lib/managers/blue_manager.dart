@@ -1,20 +1,22 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:developer';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:smart_hotel_app/core/protobuf/device_commands.pb.dart';
 
 class BlueManager {
   BlueManager({
     required this.deviceName,
     required this.serviceUuid,
+    required this.characteristicTokenUuid,
     required this.characteristicUuid,
   });
 
   final String deviceName;
   final String serviceUuid;
+  final String characteristicTokenUuid;
   final String characteristicUuid;
 
   Future<void> _turnOnBlue() async {
@@ -41,7 +43,6 @@ class BlueManager {
         final completer = Completer<BluetoothDevice>();
         final subscription = FlutterBluePlus.onScanResults.listen((results) {
           for (final result in results) {
-            log('Found device: ${result.device.advName}');
             if (result.device.advName == deviceName) {
               FlutterBluePlus.stopScan();
               completer.complete(result.device);
@@ -70,25 +71,12 @@ class BlueManager {
   Future<BluetoothService?> findServiceFromDevice(
     BluetoothDevice device,
   ) async {
-    // Ensure we're connected
-    await device.connect(autoConnect: false);
-    // Slight delay to allow connection
-    await Future.delayed(const Duration(milliseconds: 500));
+    await device.connect();
 
     // Discover services with timeout
     List<BluetoothService> services;
     try {
-      services = await device.discoverServices().timeout(
-        const Duration(seconds: 10),
-      );
-
-      // TODO: Delete test logic!
-      services.forEach((service) {
-        log('Discovered service: ${service.uuid}');
-        service.characteristics.forEach((characteristic) {
-          log('Characteristic: ${characteristic.uuid}');
-        });
-      });
+      services = await device.discoverServices();
     } catch (e) {
       log('Error discovering services: $e');
       await device.disconnect();
@@ -115,14 +103,74 @@ class BlueManager {
   /// Find characteristic within a service by UUID
   BluetoothCharacteristic? findCharacteristicFromService(
     BluetoothService service,
+    String characteristicName,
   ) {
     return service.characteristics.firstWhere(
-      (c) => c.uuid == Guid(characteristicUuid),
+      (c) => c.uuid == Guid(characteristicName),
       orElse: () {
-        log('Characteristic $characteristicUuid not found');
+        log('Characteristic $characteristicName not found');
         throw Exception("Error");
       },
     );
+  }
+
+  Uint8List prepareAndSendIdentifyRequest(String tokenValue) {
+    // 1. Создать объект IdentifyRequest
+    IdentifyRequest request = IdentifyRequest();
+
+    // 2. Заполнить его данными
+    request.token = tokenValue;
+
+    // 3. Сериализовать в байты
+    Uint8List dataToSend = request.writeToBuffer();
+
+    log("Подготовленные байты для IdentifyRequest: $dataToSend");
+    log("Размер: ${dataToSend.lengthInBytes} байт");
+    return dataToSend;
+  }
+
+  // Функция для подготовки байтов для включения света
+  Uint8List prepareTurnLightOnCommand() {
+    // Шаг 1: Создаем сообщение SetState
+    SetState setStatePayload = SetState();
+
+    // Шаг 2: Устанавливаем желаемое состояние в SetState.
+    // States.LightOn приходит из твоего сгенерированного device_commands.pbenum.dart
+    setStatePayload.state = States.LightOff;
+
+    // Шаг 3: Создаем "контейнер" ClientMessage
+    ClientMessage clientMessage = ClientMessage();
+
+    // Шаг 4: Помещаем наш SetState внутрь ClientMessage.
+    // Присваивание полю `setState` автоматически выбирает его как активное поле в `oneof message`.
+    clientMessage.setState = setStatePayload;
+
+    // Шаг 5: Сериализуем ClientMessage в байтовый массив
+    Uint8List bytesToSend = clientMessage.writeToBuffer();
+
+    // Выводим для проверки (опционально)
+    log(
+      'Сериализованные байты для включения света (ClientMessage): $bytesToSend',
+    );
+    log('Размер данных: ${bytesToSend.lengthInBytes} байт');
+
+    return bytesToSend;
+  }
+
+  /// Готовит сериализованные байты для ClientMessage с командой SetState.
+  ///
+  /// [stateToSet]: Значение из enum States, которое необходимо установить.
+  Uint8List prepareSetStateCommand(States stateToSet) {
+    ClientMessage clientMessage = ClientMessage();
+    clientMessage.setState = SetState(state: stateToSet);
+
+    Uint8List bytesToSend = clientMessage.writeToBuffer();
+
+    log(
+      'Подготовлен ClientMessage (SetState: ${stateToSet.name}): Байты=${bytesToSend.toString()}',
+    );
+
+    return bytesToSend;
   }
 
   Future<void> justTestFunc() async {
@@ -138,17 +186,35 @@ class BlueManager {
       return;
     }
 
-    final characteristic = findCharacteristicFromService(service);
-    if (characteristic == null) {
-      log('Characteristic $characteristicUuid not found');
+    final tokenCharacteristic = findCharacteristicFromService(
+      service,
+      characteristicTokenUuid,
+    );
+    if (tokenCharacteristic == null) {
+      log('Characteristic $characteristicTokenUuid not found');
       return;
     }
+    final bytes = prepareAndSendIdentifyRequest("CE0HOsYGo2oS8sdF");
+    await tokenCharacteristic.write(bytes);
+    log('Writen');
 
-    final bytes = await characteristic.read();
-    log('Read value: $bytes');
-    log(utf8.decode(bytes));
-    // Disconnect when done
-    await device.disconnect();
+    final characteristic = findCharacteristicFromService(
+      service,
+      characteristicUuid,
+    );
+
+    // Предположим, вы уже получили объект `BluetoothCharacteristic characteristic`
+    await characteristic?.setNotifyValue(true); // включает уведомления
+    final subscription = characteristic?.onValueReceived.listen((
+      List<int> value,
+    ) {
+      // сюда придут байты ответа от контроллера
+      log('Notification received: $value');
+    });
+    subscription != null ? device.cancelWhenDisconnected(subscription) : null;
+
+    final bytesLight = prepareSetStateCommand(States.DoorLockOpen);
+    await characteristic?.write(bytesLight);
   }
 
   Stream<List<ScanResult>> get scanResultStream =>

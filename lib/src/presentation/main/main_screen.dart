@@ -12,7 +12,7 @@ class MainScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AutoTabsRouter(
-      routes: [LoginRoute(), RegistrationRoute()],
+      routes: [HomeRoute(), ManagerRoute()],
       builder: (context, child) {
         final tabsRouter = AutoTabsRouter.of(context);
         final List<HotelNavigationBarItem> items = [
@@ -20,7 +20,6 @@ class MainScreen extends StatelessWidget {
           HotelNavigationBarItem(iconPath: AppIcons.squareGrid),
           HotelNavigationBarItem(iconPath: AppIcons.food),
         ];
-
         return Stack(
           children: [
             child,
