@@ -5,7 +5,13 @@ import 'package:smart_hotel_app/router/router.gr.dart';
 class AppRouter extends RootStackRouter {
   @override
   List<AutoRoute> get routes => [
-    AutoRoute(page: RegistrationRoute.page, path: '/'),
-    AutoRoute(page: LoginRoute.page, path: '/login'),
+    AutoRoute(
+      page: MainRoute.page,
+      path: '/',
+      children: [
+        AutoRoute(page: RegistrationRoute.page, path: 'register'),
+        AutoRoute(page: LoginRoute.page, path: 'login'),
+      ],
+    ),
   ];
 }

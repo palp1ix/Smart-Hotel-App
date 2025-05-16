@@ -8,12 +8,12 @@ class HotelNavigationBar extends StatelessWidget {
     super.key,
     required this.currentIndex,
     required this.items,
-    this.onTap,
+    required this.onTap,
   }) : assert(items.length > 2 && items.length < 5);
 
   final int currentIndex;
   final List<HotelNavigationBarItem> items;
-  final VoidCallback? onTap;
+  final Function(int) onTap;
 
   final double kHeight = 61;
 
@@ -21,6 +21,7 @@ class HotelNavigationBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: kHeight,
+      width: double.infinity,
       decoration: BoxDecoration(
         color: AppColors.secondContainer,
         borderRadius: BorderRadius.circular(20),
@@ -31,9 +32,9 @@ class HotelNavigationBar extends StatelessWidget {
           ...List.generate(items.length, (index) {
             return Expanded(
               child: GestureDetector(
-                onTap: onTap,
+                onTap: () => onTap(index),
                 child: _HotelNavigationBarItemWidget(
-                  item: items[currentIndex],
+                  item: items[index],
                   isSelected: currentIndex == index,
                 ),
               ),
@@ -62,11 +63,17 @@ class _HotelNavigationBarItemWidget extends StatelessWidget {
         item.selectedIconPath != null
             ? SvgPicture.asset(
               isSelected ? item.selectedIconPath! : item.iconPath,
-              colorFilter: ColorFilter.mode(AppColors.main, BlendMode.srcIn),
+              colorFilter:
+                  isSelected
+                      ? ColorFilter.mode(AppColors.main, BlendMode.srcIn)
+                      : ColorFilter.mode(Colors.white, BlendMode.srcIn),
             )
             : SvgPicture.asset(
               item.iconPath,
-              colorFilter: ColorFilter.mode(AppColors.main, BlendMode.srcIn),
+              colorFilter:
+                  isSelected
+                      ? ColorFilter.mode(AppColors.main, BlendMode.srcIn)
+                      : ColorFilter.mode(Colors.white, BlendMode.srcIn),
             ),
       ],
     );
