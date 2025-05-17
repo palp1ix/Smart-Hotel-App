@@ -52,6 +52,7 @@ class BlueManager {
     required this.serviceUuid,
     required this.characteristicTokenUuid,
     required this.characteristicUuid,
+    required this.authToken,
   }) {
     _adapterStateSubscription = FlutterBluePlus.adapterState.listen((state) {
       log('Bluetooth Adapter State Changed: $state');
@@ -69,6 +70,7 @@ class BlueManager {
   final String serviceUuid;
   final String characteristicTokenUuid;
   final String characteristicUuid;
+  final String authToken;
 
   BluetoothDevice? _targetDevice;
   BluetoothCharacteristic? _tokenCharacteristic;
@@ -288,7 +290,7 @@ class BlueManager {
         ),
       );
       final identifyBytes = prepareAndSendIdentifyRequest(
-        "CE0HOsYGo2oS8sdF",
+        authToken,
       ); // ЗАМЕНИТЕ ТОКЕН
       await _tokenCharacteristic!.write(
         identifyBytes,
@@ -470,10 +472,8 @@ class BlueManager {
           return;
         }
         try {
-          final decoded = ControllerResponse.fromBuffer(
-            value,
-          ); // Предполагаем, что ответ ВСЕГДА ControllerResponse
-          log('Notification: Decoded: ${decoded.toDebugString()}, Raw: $value');
+          final decoded = ControllerResponse.fromBuffer(value);
+          log('Notification: Decoded: ${decoded.status.name}, Raw: $value');
           if (decoded.hasState()) {
             _feedbackController.add(
               BleFeedback(
@@ -569,6 +569,14 @@ class BlueManager {
           message: '${operationDescription ?? messageType} sent.',
         ),
       );
+
+      try {
+        final value = await _commandCharacteristic!.read();
+        final decoded = ControllerResponse.fromBuffer(value);
+        log('Command response: ${decoded.status.name}, Raw: $value');
+      } on Exception catch (e) {
+        log('Error reading command response: $e');
+      }
     } catch (e) {
       log('Error writing command: $e');
       _feedbackController.add(

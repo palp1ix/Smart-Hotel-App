@@ -99,9 +99,9 @@ class _HotelSliderState extends State<HotelSlider> {
   @override
   Widget build(BuildContext context) {
     return Container(
+      height: 30,
       // The total width of the slider component is _maxSliderWidth
       width: _maxSliderWidth,
-      height: 20, // Height of the slider track
       decoration: BoxDecoration(
         color: AppColors.onContainer, // Background of the slider track
         borderRadius: BorderRadius.circular(widget.borderRadius),

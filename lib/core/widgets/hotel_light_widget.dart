@@ -49,7 +49,7 @@ class HotelLightWidget extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 4), // Adjusted spacing
+            const SizedBox(height: 3), // Adjusted spacing
             Row(
               children: [
                 getGeistText(
@@ -64,13 +64,12 @@ class HotelLightWidget extends StatelessWidget {
                 ),
               ],
             ),
-            SizedBox(
-              height: 10, // Adjusted spacing
-            ),
+            const SizedBox(height: 3), // Adjusted spacing
             // The HotelSlider needs to be very compact to fit in the remaining space.
             // If HotelSlider is too big, it will cause an overflow.
             // Using Expanded will make it take the remaining vertical space.
-            Flexible(
+            SizedBox(
+              height: 20,
               child: HotelSlider(
                 iconPath: lightParams.sliderIconPath, // Use from params
                 value:

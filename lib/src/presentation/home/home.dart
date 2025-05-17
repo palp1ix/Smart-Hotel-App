@@ -1,6 +1,7 @@
 import 'package:auto_route/annotations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:get_it/get_it.dart';
 import 'package:smart_hotel_app/core/colors/colors.dart';
 // Assuming getGeistText is defined in fonts.dart or widgets.dart
 // If it's in fonts.dart:
@@ -8,6 +9,7 @@ import 'package:smart_hotel_app/core/fonts/fonts.dart';
 // If it's in widgets.dart (and re-exports fonts or defines it directly):
 import 'package:smart_hotel_app/core/widgets/widgets.dart';
 import 'package:smart_hotel_app/core/widgets/hotel_structure_widget.dart';
+import 'package:smart_hotel_app/managers/blue_manager.dart';
 import 'package:smart_hotel_app/src/presentation/home/widgets/quick_action.dart';
 
 @RoutePage()
@@ -28,28 +30,43 @@ class _HomeScreenState extends State<HomeScreen> {
     'Sunrise': 'assets/icons/sunrise.svg',
   };
 
-  final _listActions = [
-    QuickActionModel(
-      title: 'Lightning',
-      subtitle: '6 lights',
-      iconPath: 'assets/icons/lightbulb.max.svg',
-      isSelected: true,
-    ),
-    QuickActionModel(
-      title: 'Manage room',
-      subtitle: '204',
-      iconPath: 'assets/icons/arrow.up.rightsvg.svg',
-    ),
-    QuickActionModel(
-      title: 'Sound',
-      subtitle: '3 devices',
-      iconPath: 'assets/icons/play.house.svg',
-    ),
-  ];
+  bool isSelected = false;
 
   int _selectedItemIndex = -1;
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final listActions = [
+      QuickActionModel(
+        title: 'Lightning',
+        subtitle: '6 lights',
+        iconPath: 'assets/icons/lightbulb.max.svg',
+        isSelected: isSelected,
+        onTap: () {
+          setState(() {
+            final blueManager = GetIt.I<BlueManager>();
+            isSelected ? blueManager.turnLightOff() : blueManager.turnLightOn();
+            isSelected = !isSelected;
+          });
+        },
+      ),
+      QuickActionModel(
+        title: 'Manage room',
+        subtitle: '204',
+        iconPath: 'assets/icons/arrow.up.rightsvg.svg',
+      ),
+      QuickActionModel(
+        title: 'Sound',
+        subtitle: '3 devices',
+        iconPath: 'assets/icons/play.house.svg',
+      ),
+    ];
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AppColors.background,
@@ -97,18 +114,20 @@ class _HomeScreenState extends State<HomeScreen> {
                     height: 120,
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
-                      itemCount: _listActions.length,
+                      itemCount: listActions.length,
                       itemBuilder: (context, index) {
-                        final title = _listActions[index].title;
-                        final subtitle = _listActions[index].subtitle;
-                        final iconPath = _listActions[index].iconPath;
-                        final isSelected = _listActions[index].isSelected;
+                        final title = listActions[index].title;
+                        final subtitle = listActions[index].subtitle;
+                        final iconPath = listActions[index].iconPath;
+                        final isSelected = listActions[index].isSelected;
+                        final onTap = listActions[index].onTap;
 
                         return QuickActionContainer(
                           title: title,
                           subtitle: subtitle,
                           iconPath: iconPath,
                           isSelected: isSelected,
+                          onTap: onTap,
                         );
                       },
                     ),
@@ -228,11 +247,16 @@ class UserInfoCard extends StatelessWidget {
               ),
               Spacer(),
               GestureDetector(
-                onTap: () {},
+                onTap: () async {
+                  try {
+                    final blueManager = GetIt.I<BlueManager>();
+                    await blueManager.openDoor();
+                  } catch (e) {}
+                },
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Color(0xFF282F31),
-                    borderRadius: BorderRadius.circular(30),
+                    color: AppColors.main,
+                    borderRadius: BorderRadius.circular(15),
                   ),
                   width: double.infinity,
                   height: 55,
@@ -246,7 +270,7 @@ class UserInfoCard extends StatelessWidget {
                         width: 50,
                         height: 50,
                         decoration: BoxDecoration(
-                          color: AppColors.main,
+                          color: AppColors.onMain,
                           shape: BoxShape.circle,
                         ),
                         child: Padding(

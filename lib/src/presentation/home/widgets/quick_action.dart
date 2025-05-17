@@ -10,17 +10,19 @@ class QuickActionContainer extends StatelessWidget {
     required this.subtitle,
     required this.iconPath,
     required this.isSelected,
+    this.onTap,
   });
 
   final String title;
   final String subtitle;
   final String iconPath;
   final bool isSelected;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () {},
+      onTap: () => onTap != null ? onTap!() : null,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         width: 141,
@@ -82,10 +84,12 @@ class QuickActionModel {
     required this.subtitle,
     required this.iconPath,
     this.isSelected = false,
+    this.onTap,
   });
 
   final String title;
   final String subtitle;
   final String iconPath;
   final bool isSelected;
+  final VoidCallback? onTap;
 }

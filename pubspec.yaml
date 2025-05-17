@@ -8,6 +8,7 @@ environment:
 
 dependencies:
   auto_route: ^10.0.1
+  dio: ^5.8.0+1
   flutter:
     sdk: flutter
   # State managment
@@ -15,7 +16,10 @@ dependencies:
   # Work with bluetooth
   flutter_blue_plus: ^1.35.5
   # Work with svg icons
+  flutter_secure_storage: ^4.2.1
   flutter_svg: ^2.1.0
+  get_it: ^8.0.3
+  jwt_decoder: ^2.0.1
   protobuf: ^4.0.0
 
 dev_dependencies:
@@ -29,6 +33,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/icons/
+    - assets/images/
   fonts:
     - family: Geist
       fonts:
