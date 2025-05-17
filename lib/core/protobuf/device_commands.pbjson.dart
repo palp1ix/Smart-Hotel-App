@@ -204,3 +204,35 @@ final $typed_data.Uint8List controllerResponseDescriptor = $convert.base64Decode
     'F0ZRgCIAEoCzIGLlN0YXRlSABSBXN0YXRlEiMKBnN0YXR1cxgDIAEoDjIJLlN0YXR1c2VzSABS'
     'BnN0YXR1c0IKCghyZXNwb25zZQ==');
 
+const $core.Map<$core.String, $core.dynamic> DeviceControllerServiceBase$json = {
+  '1': 'DeviceController',
+  '2': [
+    {'1': 'Identify', '2': '.IdentifyRequest', '3': '.ControllerResponse'},
+    {'1': 'GetDeviceInfo', '2': '.ClientMessage', '3': '.ControllerResponse'},
+    {'1': 'GetDeviceState', '2': '.GetState', '3': '.ControllerResponse'},
+    {'1': 'SetDeviceState', '2': '.SetState', '3': '.ControllerResponse'},
+    {'1': 'ProcessClientMessage', '2': '.ClientMessage', '3': '.ControllerResponse'},
+  ],
+};
+
+@$core.Deprecated('Use deviceControllerServiceDescriptor instead')
+const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>> DeviceControllerServiceBase$messageJson = {
+  '.IdentifyRequest': IdentifyRequest$json,
+  '.ControllerResponse': ControllerResponse$json,
+  '.Info': Info$json,
+  '.State': State$json,
+  '.ClientMessage': ClientMessage$json,
+  '.GetInfo': GetInfo$json,
+  '.SetState': SetState$json,
+  '.GetState': GetState$json,
+};
+
+/// Descriptor for `DeviceController`. Decode as a `google.protobuf.ServiceDescriptorProto`.
+final $typed_data.Uint8List deviceControllerServiceDescriptor = $convert.base64Decode(
+    'ChBEZXZpY2VDb250cm9sbGVyEjEKCElkZW50aWZ5EhAuSWRlbnRpZnlSZXF1ZXN0GhMuQ29udH'
+    'JvbGxlclJlc3BvbnNlEjQKDUdldERldmljZUluZm8SDi5DbGllbnRNZXNzYWdlGhMuQ29udHJv'
+    'bGxlclJlc3BvbnNlEjAKDkdldERldmljZVN0YXRlEgkuR2V0U3RhdGUaEy5Db250cm9sbGVyUm'
+    'VzcG9uc2USMAoOU2V0RGV2aWNlU3RhdGUSCS5TZXRTdGF0ZRoTLkNvbnRyb2xsZXJSZXNwb25z'
+    'ZRI7ChRQcm9jZXNzQ2xpZW50TWVzc2FnZRIOLkNsaWVudE1lc3NhZ2UaEy5Db250cm9sbGVyUm'
+    'VzcG9uc2U=');
+

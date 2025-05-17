@@ -43,7 +43,8 @@ class QuickActionContainer extends StatelessWidget {
                   height: 45,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: AppColors.onMain,
+                    color:
+                        isSelected ? AppColors.onMain : AppColors.onContainer,
                   ),
                   child: SvgPicture.asset(
                     width: 23,
@@ -80,9 +81,11 @@ class QuickActionModel {
     required this.title,
     required this.subtitle,
     required this.iconPath,
+    this.isSelected = false,
   });
 
   final String title;
   final String subtitle;
   final String iconPath;
+  final bool isSelected;
 }

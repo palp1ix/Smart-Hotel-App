@@ -9,22 +9,24 @@ class HotelIconSwitch extends StatefulWidget {
     required this.onSelect,
     required this.onUnSelect,
     required this.iconPath,
+    this.isSelected = false,
   });
 
   final double size;
   final VoidCallback onSelect;
   final VoidCallback onUnSelect;
   final String iconPath;
+  final bool isSelected;
 
   @override
   State<HotelIconSwitch> createState() => _HotelIconSwitchState();
 }
 
 class _HotelIconSwitchState extends State<HotelIconSwitch> {
-  bool isSelected = false;
-
   @override
   Widget build(BuildContext context) {
+    bool isSelected = widget.isSelected;
+
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -32,9 +34,9 @@ class _HotelIconSwitchState extends State<HotelIconSwitch> {
         });
 
         if (isSelected) {
-          widget.onSelect;
+          widget.onSelect();
         } else {
-          widget.onUnSelect;
+          widget.onUnSelect();
         }
       },
       child: AnimatedContainer(
@@ -43,7 +45,7 @@ class _HotelIconSwitchState extends State<HotelIconSwitch> {
         height: widget.size,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: isSelected ? AppColors.main : AppColors.onContainer,
+          color: isSelected ? AppColors.main : AppColors.container,
         ),
         child: Padding(
           padding: EdgeInsets.all(5),

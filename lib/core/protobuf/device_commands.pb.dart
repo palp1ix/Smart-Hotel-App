@@ -9,6 +9,7 @@
 // ignore_for_file: non_constant_identifier_names, prefer_final_fields
 // ignore_for_file: unnecessary_import, unnecessary_this, unused_import
 
+import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
@@ -607,6 +608,27 @@ class ControllerResponse extends $pb.GeneratedMessage {
   $core.bool hasStatus() => $_has(2);
   @$pb.TagNumber(3)
   void clearStatus() => $_clearField(3);
+}
+
+class DeviceControllerApi {
+  $pb.RpcClient _client;
+  DeviceControllerApi(this._client);
+
+  $async.Future<ControllerResponse> identify($pb.ClientContext? ctx, IdentifyRequest request) =>
+    _client.invoke<ControllerResponse>(ctx, 'DeviceController', 'Identify', request, ControllerResponse())
+  ;
+  $async.Future<ControllerResponse> getDeviceInfo($pb.ClientContext? ctx, ClientMessage request) =>
+    _client.invoke<ControllerResponse>(ctx, 'DeviceController', 'GetDeviceInfo', request, ControllerResponse())
+  ;
+  $async.Future<ControllerResponse> getDeviceState($pb.ClientContext? ctx, GetState request) =>
+    _client.invoke<ControllerResponse>(ctx, 'DeviceController', 'GetDeviceState', request, ControllerResponse())
+  ;
+  $async.Future<ControllerResponse> setDeviceState($pb.ClientContext? ctx, SetState request) =>
+    _client.invoke<ControllerResponse>(ctx, 'DeviceController', 'SetDeviceState', request, ControllerResponse())
+  ;
+  $async.Future<ControllerResponse> processClientMessage($pb.ClientContext? ctx, ClientMessage request) =>
+    _client.invoke<ControllerResponse>(ctx, 'DeviceController', 'ProcessClientMessage', request, ControllerResponse())
+  ;
 }
 
 

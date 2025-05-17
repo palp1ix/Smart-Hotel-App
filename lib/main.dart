@@ -16,7 +16,7 @@ void main() async {
     characteristicTokenUuid: "ff02",
   );
 
-  await blueManager.justTestFunc();
+  blueManager.justTestFunc();
 }
 
 class HotelApp extends StatelessWidget {

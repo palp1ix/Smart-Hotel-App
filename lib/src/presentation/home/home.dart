@@ -1,9 +1,13 @@
 import 'package:auto_route/annotations.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:smart_hotel_app/core/colors/colors.dart';
+// Assuming getGeistText is defined in fonts.dart or widgets.dart
+// If it's in fonts.dart:
 import 'package:smart_hotel_app/core/fonts/fonts.dart';
-import 'package:smart_hotel_app/core/widgets/hotel_structure_widget.dart';
+// If it's in widgets.dart (and re-exports fonts or defines it directly):
 import 'package:smart_hotel_app/core/widgets/widgets.dart';
+import 'package:smart_hotel_app/core/widgets/hotel_structure_widget.dart';
 import 'package:smart_hotel_app/src/presentation/home/widgets/quick_action.dart';
 
 @RoutePage()
@@ -29,6 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
       title: 'Lightning',
       subtitle: '6 lights',
       iconPath: 'assets/icons/lightbulb.max.svg',
+      isSelected: true,
     ),
     QuickActionModel(
       title: 'Manage room',
@@ -58,7 +63,6 @@ class _HomeScreenState extends State<HomeScreen> {
               Row(
                 children: [
                   SizedBox(width: 20),
-
                   getGeistText(
                     'Hello, ',
                     weight: 600,
@@ -76,7 +80,8 @@ class _HomeScreenState extends State<HomeScreen> {
               SizedBox(height: 20),
               UserInfoCard(
                 userInfo: UserInfo(
-                  name: 'Artem',
+                  name: 'Kim',
+                  surname: 'Kardashian',
                   temperature: 30.2,
                   doorClosed: true,
                   room: '204',
@@ -97,12 +102,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         final title = _listActions[index].title;
                         final subtitle = _listActions[index].subtitle;
                         final iconPath = _listActions[index].iconPath;
+                        final isSelected = _listActions[index].isSelected;
 
                         return QuickActionContainer(
                           title: title,
                           subtitle: subtitle,
                           iconPath: iconPath,
-                          isSelected: true,
+                          isSelected: isSelected,
                         );
                       },
                     ),
@@ -182,93 +188,82 @@ class UserInfoCard extends StatelessWidget {
             children: [
               SizedBox(height: 15),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-
+                mainAxisAlignment: MainAxisAlignment.start,
                 children: [
-                  Column(
-                    children: [
-                      getGeistText(
-                        userInfo.name,
-                        weight: 600,
-                        size: 22,
-                        color: Colors.white,
-                      ),
-                      getGeistText(
-                        'Name',
-                        weight: 600,
-                        size: 16,
-                        color: AppColors.onContainer,
-                      ),
-                    ],
+                  InfoItemWidget(value: userInfo.name, label: 'Name'),
+                  SizedBox(width: 40),
+                  InfoItemWidget(
+                    value: userInfo.surname,
+                    label:
+                        'Name', // As per original code, consider changing to 'Surname'
                   ),
-                  SizedBox.shrink(),
-                  SizedBox.shrink(),
-
-                  Column(
-                    children: [
-                      getGeistText(
-                        userInfo.room,
-                        weight: 600,
-                        size: 24,
-                        color: AppColors.main,
-                      ),
-                      getGeistText(
-                        'Room ',
-                        weight: 600,
-                        size: 16,
-                        color: AppColors.onContainer,
-                      ),
-                    ],
+                  SizedBox(width: 40),
+                  InfoItemWidget(
+                    value: userInfo.room,
+                    label: 'Room ',
+                    valueSize: 24,
+                    valueColor: AppColors.main,
+                    alignment:
+                        CrossAxisAlignment.center, // To match original layout
                   ),
                 ],
               ),
               SizedBox(height: 10),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                mainAxisAlignment: MainAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Column(
-                    children: [
-                      getGeistText(
-                        '${userInfo.temperature}°C',
-                        weight: 600,
-                        size: 20,
-                        color: Colors.white,
-                      ),
-                      getGeistText(
-                        'Temperature',
-                        weight: 600,
-                        size: 16,
-                        color: AppColors.onContainer,
-                      ),
-                    ],
+                  InfoItemWidget(
+                    value: '${userInfo.temperature}°C',
+                    label: 'Temperature',
+                    valueSize: 20,
                   ),
-                  SizedBox.shrink(),
-                  SizedBox.shrink(),
-                  SizedBox.shrink(),
-
-                  Column(
-                    children: [
-                      getGeistText(
-                        userInfo.doorClosed ? 'Closed' : 'Open',
-                        weight: 600,
-                        size: 20,
-                        color: Colors.white,
-                      ),
-                      getGeistText(
-                        'Door',
-                        weight: 600,
-                        size: 16,
-                        color: AppColors.onContainer,
-                      ),
-                    ],
+                  SizedBox(width: 30),
+                  InfoItemWidget(
+                    value: userInfo.doorClosed ? 'Closed' : 'Open',
+                    label: 'Door',
+                    valueSize: 20,
                   ),
                 ],
               ),
               Spacer(),
-              HotelPrimaryButton(
-                title: 'Open door',
-                color: AppColors.onContainer,
-                onPressed: () {},
+              GestureDetector(
+                onTap: () {},
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Color(0xFF282F31),
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  width: double.infinity,
+                  height: 55,
+                  child: Row(
+                    children: [
+                      SizedBox(width: 20),
+                      getGeistText('Open door', weight: 600, size: 17),
+                      Spacer(),
+                      Container(
+                        margin: EdgeInsets.all(4),
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: AppColors.main,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(10),
+                          child: SvgPicture.asset(
+                            fit: BoxFit.contain,
+                            'assets/icons/key.svg',
+                            // ignore: deprecated_member_use
+                            color:
+                                Colors.white, // For older flutter_svg versions
+                            // colorFilter: ColorFilter.mode(Colors.white, BlendMode.srcIn), // For newer versions
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
               SizedBox(height: 10),
             ],
@@ -279,15 +274,58 @@ class UserInfoCard extends StatelessWidget {
   }
 }
 
+/// A reusable widget to display a value and its corresponding label.
+class InfoItemWidget extends StatelessWidget {
+  const InfoItemWidget({
+    super.key,
+    required this.value,
+    required this.label,
+    this.valueColor = Colors.white,
+    this.valueSize = 22.0,
+    this.valueWeight = 600,
+    this.alignment = CrossAxisAlignment.start,
+  });
+
+  final String value;
+  final String label;
+  final Color valueColor;
+  final double valueSize;
+  final int valueWeight;
+  final CrossAxisAlignment alignment;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: alignment,
+      children: [
+        getGeistText(
+          value,
+          weight: valueWeight.toDouble(),
+          size: valueSize,
+          color: valueColor,
+        ),
+        getGeistText(
+          label,
+          weight: 600, // Consistent label style
+          size: 16, // Consistent label style
+          color: AppColors.onContainer, // Consistent label style
+        ),
+      ],
+    );
+  }
+}
+
 class UserInfo {
   UserInfo({
     required this.name,
+    required this.surname,
     required this.temperature,
     required this.doorClosed,
     required this.room,
   });
 
   final String name;
+  final String surname;
   final double temperature;
   final bool doorClosed;
   final String room;
