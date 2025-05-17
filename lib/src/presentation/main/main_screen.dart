@@ -12,7 +12,7 @@ class MainScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AutoTabsRouter(
-      routes: [HomeRoute(), ManagerRoute()],
+      routes: [HomeRoute(), ManagerRoute(), RestaurantRoute()],
       builder: (context, child) {
         final tabsRouter = AutoTabsRouter.of(context);
         final List<HotelNavigationBarItem> items = [

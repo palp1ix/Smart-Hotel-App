@@ -1,109 +1,400 @@
 import 'dart:async';
 import 'dart:developer';
 import 'dart:io';
-import 'dart:typed_data'; // Добавлен импорт для Uint8List
+import 'dart:typed_data'; // For Uint8List
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:protobuf/protobuf.dart'; // Для GeneratedMessage
 // Убедитесь, что путь к вашему protobuf файлу правильный
-import 'package:smart_hotel_app/core/protobuf/device_commands.pb.dart';
+import 'package:smart_hotel_app/core/protobuf/device_commands.pb.dart'; // Предполагаемый путь
+
+// Enum for feedback status (без изменений)
+enum BleOperationStatus {
+  idle,
+  bluetoothTurningOn,
+  bluetoothOn,
+  scanning,
+  deviceFound,
+  connecting,
+  connected,
+  servicesDiscovered,
+  characteristicsFound,
+  sendingToken,
+  tokenSent,
+  sendingCommand,
+  commandSent,
+  operationSuccess,
+  operationFailed,
+  dataReceived,
+  disconnected,
+  error,
+}
+
+// Class for feedback data (без изменений)
+class BleFeedback {
+  final BleOperationStatus status;
+  final String? message;
+  final dynamic data;
+
+  BleFeedback({required this.status, this.message, this.data});
+
+  @override
+  String toString() {
+    return 'BleFeedback(status: $status, message: $message, data: $data)';
+  }
+}
 
 class BlueManager {
+  // Конструктор и поля (без изменений)
   BlueManager({
     required this.deviceName,
     required this.serviceUuid,
     required this.characteristicTokenUuid,
     required this.characteristicUuid,
-  });
+  }) {
+    _adapterStateSubscription = FlutterBluePlus.adapterState.listen((state) {
+      log('Bluetooth Adapter State Changed: $state');
+      if (state == BluetoothAdapterState.on) {
+        _feedbackController.add(
+          BleFeedback(status: BleOperationStatus.bluetoothOn),
+        );
+      } else {
+        _resetState(notify: true, reason: "Bluetooth adapter turned off");
+      }
+    });
+  }
 
   final String deviceName;
   final String serviceUuid;
   final String characteristicTokenUuid;
   final String characteristicUuid;
 
+  BluetoothDevice? _targetDevice;
+  BluetoothCharacteristic? _tokenCharacteristic;
+  BluetoothCharacteristic? _commandCharacteristic;
+
+  StreamSubscription<BluetoothConnectionState>? _connectionStateSubscription;
+  StreamSubscription<List<int>>? _notificationSubscription;
+  StreamSubscription<BluetoothAdapterState>? _adapterStateSubscription;
+
+  bool _isInitialized = false;
+  bool _isInitializing = false;
+
+  final StreamController<BleFeedback> _feedbackController =
+      StreamController<BleFeedback>.broadcast();
+  Stream<BleFeedback> get feedbackStream => _feedbackController.stream;
+
+  // _turnOnBlue (без изменений)
   Future<void> _turnOnBlue() async {
     if (!kIsWeb && Platform.isAndroid) {
-      // Проверим текущее состояние перед включением
       if (FlutterBluePlus.adapterStateNow != BluetoothAdapterState.on) {
+        _feedbackController.add(
+          BleFeedback(
+            status: BleOperationStatus.bluetoothTurningOn,
+            message: "Attempting to turn on Bluetooth...",
+          ),
+        );
         log('Bluetooth is off. Turning it on...');
-        await FlutterBluePlus.turnOn();
-        // Подождем, пока адаптер действительно включится
-        await FlutterBluePlus.adapterState
-            .where((state) => state == BluetoothAdapterState.on)
-            .first;
-        log('Bluetooth is now on.');
+        try {
+          await FlutterBluePlus.turnOn(timeout: 10);
+          await FlutterBluePlus.adapterState
+              .where((state) => state == BluetoothAdapterState.on)
+              .first
+              .timeout(
+                const Duration(seconds: 10),
+                onTimeout: () {
+                  log(
+                    "Timeout waiting for Bluetooth to turn on (stream confirmation in _turnOnBlue).",
+                  );
+                  throw Exception(
+                    "Timeout waiting for Bluetooth to turn on (stream confirmation).",
+                  );
+                },
+              );
+          log('Bluetooth is now on (confirmed by _turnOnBlue internal wait).');
+        } catch (e) {
+          log('Error during _turnOnBlue: $e');
+          rethrow;
+        }
       } else {
-        log('Bluetooth is already on.');
+        log('Bluetooth is already on (checked by _turnOnBlue).');
       }
     }
   }
 
+  // _ensureInitialized (используем версию с правильным порядком токена и уведомлений)
+  Future<void> _ensureInitialized() async {
+    if (_isInitialized) return;
+    if (_isInitializing) {
+      log("_ensureInitialized: Already initializing, waiting...");
+      await Future.doWhile(() => _isInitializing && !_isInitialized);
+      if (_isInitialized) return;
+      log("_ensureInitialized: Previous initialization finished, proceeding.");
+    }
+
+    _isInitializing = true;
+
+    try {
+      // 0. Check Bluetooth support first
+      if (!await FlutterBluePlus.isSupported) {
+        final msg = 'Bluetooth not supported by this device';
+        log(msg);
+        _feedbackController.add(
+          BleFeedback(status: BleOperationStatus.error, message: msg),
+        );
+        throw Exception(msg);
+      }
+
+      // 1. Attempt to turn on Bluetooth
+      await _turnOnBlue();
+
+      // 2. Robustly verify Bluetooth is ON
+      BluetoothAdapterState currentAdapterState =
+          FlutterBluePlus.adapterStateNow;
+      if (currentAdapterState != BluetoothAdapterState.on) {
+        log(
+          'Bluetooth adapter state is $currentAdapterState immediately after _turnOnBlue. Waiting for stream confirmation...',
+        );
+        try {
+          currentAdapterState = await FlutterBluePlus.adapterState
+              .where((state) => state == BluetoothAdapterState.on)
+              .first
+              .timeout(
+                const Duration(seconds: 5),
+                onTimeout: () {
+                  log(
+                    'Timeout waiting for Bluetooth adapter to confirm ON via stream. Last known: ${FlutterBluePlus.adapterStateNow}',
+                  );
+                  throw Exception(
+                    'Timeout waiting for Bluetooth adapter to confirm ON.',
+                  );
+                },
+              );
+          log('Bluetooth Adapter confirmed ON via stream after explicit wait.');
+        } catch (e) {
+          final msg =
+              'Failed to confirm Bluetooth is ON: $e. Current adapterStateNow: ${FlutterBluePlus.adapterStateNow}';
+          log(msg);
+          _feedbackController.add(
+            BleFeedback(status: BleOperationStatus.error, message: msg),
+          );
+          throw Exception(msg);
+        }
+      }
+      if (currentAdapterState != BluetoothAdapterState.on) {
+        final msg =
+            'Bluetooth is not ON after all checks (State: $currentAdapterState). Cannot proceed.';
+        log(msg);
+        _feedbackController.add(
+          BleFeedback(status: BleOperationStatus.error, message: msg),
+        );
+        throw Exception(msg);
+      }
+      _feedbackController.add(
+        BleFeedback(
+          status: BleOperationStatus.bluetoothOn,
+          message: "Bluetooth confirmed ON.",
+        ),
+      );
+      log('Proceeding with initialization: Bluetooth is ON.');
+
+      // 3. Find device
+      if (_targetDevice == null || !_targetDevice!.isConnected) {
+        await _connectionStateSubscription?.cancel();
+        _targetDevice = await _findDevice();
+        if (_targetDevice == null)
+          throw Exception('Device $deviceName not found.');
+      }
+
+      // 4. Connect to device
+      if (!_targetDevice!.isConnected) {
+        _feedbackController.add(
+          BleFeedback(
+            status: BleOperationStatus.connecting,
+            message: 'Connecting to ${deviceName}...',
+          ),
+        );
+        await _targetDevice!.connect(
+          timeout: const Duration(seconds: 15),
+          autoConnect: false,
+        );
+        _feedbackController.add(
+          BleFeedback(
+            status: BleOperationStatus.connected,
+            message: 'Connected to ${deviceName}',
+          ),
+        );
+        _listenToConnectionChanges();
+      } else {
+        _feedbackController.add(
+          BleFeedback(
+            status: BleOperationStatus.connected,
+            message: 'Already connected to ${deviceName}',
+          ),
+        );
+        _listenToConnectionChanges();
+      }
+
+      // 5. Discover services and characteristics
+      _feedbackController.add(
+        BleFeedback(
+          status: BleOperationStatus.servicesDiscovered,
+          message: 'Discovering services...',
+        ),
+      );
+      List<BluetoothService> services = await _targetDevice!.discoverServices(
+        timeout: 15,
+      );
+      log('Found ${services.length} services.');
+      final service = services.firstWhere(
+        (s) => s.uuid.toString().toLowerCase() == serviceUuid.toLowerCase(),
+        orElse: () => throw Exception("Service $serviceUuid not found"),
+      );
+      log('Service $serviceUuid found.');
+      _tokenCharacteristic = service.characteristics.firstWhere(
+        (c) =>
+            c.uuid.toString().toLowerCase() ==
+            characteristicTokenUuid.toLowerCase(),
+        orElse:
+            () =>
+                throw Exception(
+                  "Token characteristic $characteristicTokenUuid not found",
+                ),
+      );
+      log('Token characteristic ${_tokenCharacteristic!.uuid} found.');
+      _commandCharacteristic = service.characteristics.firstWhere(
+        (c) =>
+            c.uuid.toString().toLowerCase() == characteristicUuid.toLowerCase(),
+        orElse:
+            () =>
+                throw Exception(
+                  "Command characteristic $characteristicUuid not found",
+                ),
+      );
+      log('Command characteristic ${_commandCharacteristic!.uuid} found.');
+      _feedbackController.add(
+        BleFeedback(
+          status: BleOperationStatus.characteristicsFound,
+          message: "Required characteristics found.",
+        ),
+      );
+
+      // 6. Send token
+      _feedbackController.add(
+        BleFeedback(
+          status: BleOperationStatus.sendingToken,
+          message: "Sending identification token...",
+        ),
+      );
+      final identifyBytes = prepareAndSendIdentifyRequest(
+        "CE0HOsYGo2oS8sdF",
+      ); // ЗАМЕНИТЕ ТОКЕН
+      await _tokenCharacteristic!.write(
+        identifyBytes,
+        withoutResponse: false,
+      ); // ПРОВЕРЬТЕ withoutResponse
+      log('Token written successfully.');
+
+      // 7. Set up notifications on command characteristic
+      if (_commandCharacteristic!.properties.notify) {
+        if (!_commandCharacteristic!.isNotifying) {
+          log(
+            "Setting notify value for command characteristic AFTER token sent...",
+          );
+          await _commandCharacteristic!.setNotifyValue(true);
+          log("Notify value set successfully for command characteristic.");
+        } else {
+          log("Command characteristic already notifying.");
+        }
+        _listenToNotifications();
+      } else {
+        log('Command characteristic does not support notifications.');
+      }
+
+      _feedbackController.add(
+        BleFeedback(
+          status: BleOperationStatus.tokenSent,
+          message: 'Device initialized and ready.',
+        ),
+      );
+      _isInitialized = true;
+    } catch (e, s) {
+      log('Error during initialization: $e\nStack: $s');
+      if (!_feedbackController.isClosed && _feedbackController.hasListener) {
+        _feedbackController.add(
+          BleFeedback(
+            status: BleOperationStatus.error,
+            message: 'Initialization failed: ${e.toString()}',
+          ),
+        );
+      }
+      await _resetState(notify: false);
+      rethrow;
+    } finally {
+      _isInitializing = false;
+    }
+  }
+
+  // _getBlueAdapterStream (без изменений)
   Future<Stream<BluetoothAdapterState>> _getBlueAdapterStream() async {
     if (!await FlutterBluePlus.isSupported) {
       log('Bluetooth not supported by this device');
+      _feedbackController.add(
+        BleFeedback(
+          status: BleOperationStatus.error,
+          message: 'Bluetooth not supported',
+        ),
+      );
       throw Exception('Bluetooth not supported by this device');
     }
     await _turnOnBlue();
     return FlutterBluePlus.adapterState;
   }
 
-  Future<BluetoothDevice?> findDeviceFromName(String targetDeviceName) async {
+  // _findDevice (без изменений)
+  Future<BluetoothDevice?> _findDevice() async {
     StreamSubscription<List<ScanResult>>? scanSubscription;
     Completer<BluetoothDevice> deviceCompleter = Completer<BluetoothDevice>();
-
     try {
+      _feedbackController.add(
+        BleFeedback(
+          status: BleOperationStatus.scanning,
+          message: 'Scanning for $deviceName...',
+        ),
+      );
       final adapterStream = await _getBlueAdapterStream();
       BluetoothAdapterState currentState = await adapterStream.first;
-
       if (currentState != BluetoothAdapterState.on) {
         log('Bluetooth is not on. Current state: $currentState');
         throw Exception('Bluetooth is off!');
       }
-
-      log('Starting scan for device: $targetDeviceName...');
-      // Таймаут для сканирования устанавливается здесь
-      await FlutterBluePlus.startScan(
-        timeout: const Duration(seconds: 15),
-        // withKeywords: [targetDeviceName], // Можно использовать для фильтрации на уровне ОС, если поддерживается
-      );
-
+      log('Starting scan for device: $deviceName...');
+      await FlutterBluePlus.startScan(timeout: const Duration(seconds: 15));
       scanSubscription = FlutterBluePlus.scanResults.listen(
         (results) {
           for (ScanResult result in results) {
-            // Используем localName, platformName или advName
             String currentDeviceName =
                 result.device.platformName.isNotEmpty
                     ? result.device.platformName
                     : result.device.localName.isNotEmpty
                     ? result.device.localName
                     : result.advertisementData.advName;
-
-            if (currentDeviceName == targetDeviceName) {
+            if (currentDeviceName == deviceName) {
               log(
                 'Device found: ${result.device.platformName} (${result.device.remoteId})',
               );
-              if (!deviceCompleter.isCompleted) {
+              if (!deviceCompleter.isCompleted)
                 deviceCompleter.complete(result.device);
-              }
-              // Не останавливаем скан здесь, пусть startScan завершится по таймауту
-              // или мы его остановим в finally после получения устройства.
-              // FlutterBluePlus.stopScan(); // Лучше остановить после получения результата из completer
-              // scanSubscription?.cancel();
               break;
             }
           }
         },
         onDone: () {
-          // Вызывается, когда стрим закрыт (например, по таймауту startScan)
           if (!deviceCompleter.isCompleted) {
-            log(
-              'Scan completed. Device $targetDeviceName not found via onDone.',
-            );
+            log('Scan completed. Device $deviceName not found via onDone.');
             deviceCompleter.completeError(
-              Exception(
-                'Device $targetDeviceName not found after scan finished.',
-              ),
+              Exception('Device $deviceName not found after scan finished.'),
             );
           }
         },
@@ -114,89 +405,248 @@ class BlueManager {
           }
         },
       );
-
-      // Ожидание результата от Completer с дополнительным таймаутом
       BluetoothDevice device = await deviceCompleter.future.timeout(
-        const Duration(seconds: 20), // Общий таймаут на весь процесс поиска
+        const Duration(seconds: 20),
         onTimeout: () {
-          log('Timeout waiting for device $targetDeviceName from completer.');
-          throw Exception(
-            'Timeout: No device with name $targetDeviceName found!',
-          );
+          log('Timeout waiting for device $deviceName from completer.');
+          throw Exception('Timeout: No device with name $deviceName found!');
         },
+      );
+      _feedbackController.add(
+        BleFeedback(
+          status: BleOperationStatus.deviceFound,
+          message: 'Device $deviceName found',
+        ),
       );
       return device;
     } catch (e) {
-      log('Error in findDeviceFromName for $targetDeviceName: $e');
+      log('Error in _findDevice for $deviceName: $e');
+      _feedbackController.add(
+        BleFeedback(
+          status: BleOperationStatus.error,
+          message: 'Failed to find device: $e',
+        ),
+      );
       return null;
     } finally {
-      // Гарантированная остановка сканирования и отписка
-      if (FlutterBluePlus.isScanningNow) {
-        log('Stopping scan in finally block for findDeviceFromName...');
-        await FlutterBluePlus.stopScan();
-      }
+      if (FlutterBluePlus.isScanningNow) await FlutterBluePlus.stopScan();
       await scanSubscription?.cancel();
-      log('Scan subscription canceled in finally block.');
     }
   }
 
-  Future<BluetoothService?> findServiceFromDevice(
-    BluetoothDevice device,
-  ) async {
-    try {
-      log('Connecting to ${device.platformName} (${device.remoteId})...');
-      // Таймаут для подключения, чтобы не зависнуть навсегда
-      await device.connect(
-        timeout: const Duration(seconds: 15),
-        autoConnect: false,
-      );
-      log('Connected to ${device.platformName}. Discovering services...');
-
-      List<BluetoothService> services = await device.discoverServices();
-      log('Found ${services.length} services.');
-
-      final service = services.firstWhere(
-        (s) => s.uuid.toString().toLowerCase() == serviceUuid.toLowerCase(),
-        orElse: () {
-          log(
-            'Service with UUID $serviceUuid not found on device ${device.platformName}.',
-          );
-          throw Exception("Service $serviceUuid not found");
-        },
-      );
-      log('Service $serviceUuid found.');
-      return service;
-    } catch (e) {
-      log('Error in findServiceFromDevice for ${device.platformName}: $e');
-      // Важно отсоединиться при любой ошибке на этом этапе
-      if (device.isConnected) {
-        await device.disconnect();
-        log('Disconnected from ${device.platformName} due to error.');
+  // _listenToConnectionChanges (без изменений)
+  void _listenToConnectionChanges() {
+    _connectionStateSubscription?.cancel();
+    _connectionStateSubscription = _targetDevice!.connectionState.listen((
+      state,
+    ) {
+      log('Device ${_targetDevice?.platformName} connection state: $state');
+      if (state == BluetoothConnectionState.disconnected) {
+        _feedbackController.add(
+          BleFeedback(
+            status: BleOperationStatus.disconnected,
+            message: 'Device disconnected',
+          ),
+        );
+        _resetState(notify: false);
+      } else if (state == BluetoothConnectionState.connected) {
+        log('Device re-confirmed connected.');
       }
-      return null;
-    }
+    });
   }
 
-  BluetoothCharacteristic? findCharacteristicFromService(
-    BluetoothService service,
-    String characteristicId,
-  ) {
+  // _listenToNotifications (без изменений)
+  void _listenToNotifications() {
+    _notificationSubscription?.cancel();
+    if (_commandCharacteristic == null ||
+        !_commandCharacteristic!.properties.notify) {
+      log('Command characteristic is null or does not support notifications.');
+      return;
+    }
+    _notificationSubscription = _commandCharacteristic!.onValueReceived.listen(
+      (value) {
+        if (value.isEmpty) {
+          log('Notification: Received empty value.');
+          return;
+        }
+        try {
+          final decoded = ControllerResponse.fromBuffer(
+            value,
+          ); // Предполагаем, что ответ ВСЕГДА ControllerResponse
+          log('Notification: Decoded: ${decoded.toDebugString()}, Raw: $value');
+          if (decoded.hasState()) {
+            _feedbackController.add(
+              BleFeedback(
+                status: BleOperationStatus.dataReceived,
+                message: 'State received: ${decoded.state}',
+                data: decoded.state,
+              ),
+            );
+          } else if (decoded.hasInfo()) {
+            _feedbackController.add(
+              BleFeedback(
+                status: BleOperationStatus.dataReceived,
+                message: 'Info received: ${decoded.info}',
+                data: decoded.info,
+              ),
+            );
+          } else {
+            // Общий успешный ответ, если не было конкретных данных
+            _feedbackController.add(
+              BleFeedback(
+                status: BleOperationStatus.operationSuccess,
+                message: 'Operation confirmed by device notification.',
+                data: decoded,
+              ),
+            );
+          }
+        } catch (e) {
+          log('Notification: Error decoding: $e. Raw value: $value');
+          _feedbackController.add(
+            BleFeedback(
+              status: BleOperationStatus.error,
+              message: 'Error decoding notification: $e. Raw: $value',
+            ),
+          );
+        }
+      },
+      onError: (error) {
+        log('Error in notification subscription: $error');
+        _feedbackController.add(
+          BleFeedback(
+            status: BleOperationStatus.error,
+            message: 'Notification error: $error',
+          ),
+        );
+      },
+    );
+    log(
+      'Notification subscription configured for ${_commandCharacteristic!.uuid}.',
+    );
+  }
+
+  // ИЗМЕНЕННЫЙ _sendCommand: принимает GeneratedMessage
+  Future<void> _sendCommand(
+    GeneratedMessage commandMessage, { // Принимаем базовый класс Protobuf
+    String? operationDescription,
+  }) async {
+    await _ensureInitialized();
+
+    if (_commandCharacteristic == null) {
+      _feedbackController.add(
+        BleFeedback(
+          status: BleOperationStatus.error,
+          message: 'Command characteristic not available.',
+        ),
+      );
+      throw Exception('Command characteristic not available.');
+    }
+
+    // Сериализуем переданное сообщение напрямую
+    final Uint8List bytesToSend = commandMessage.writeToBuffer();
+    String messageType = commandMessage.runtimeType.toString();
+    log(
+      'Sending $messageType (${operationDescription ?? "command"}): Bytes=$bytesToSend, Size=${bytesToSend.lengthInBytes}',
+    );
+    _feedbackController.add(
+      BleFeedback(
+        status: BleOperationStatus.sendingCommand,
+        message: 'Sending ${operationDescription ?? messageType}...',
+      ),
+    );
+
     try {
-      final characteristic = service.characteristics.firstWhere(
-        (c) =>
-            c.uuid.toString().toLowerCase() == characteristicId.toLowerCase(),
-      );
-      log('Characteristic $characteristicId found in service ${service.uuid}.');
-      return characteristic;
-    } catch (e) {
-      // firstWhere без orElse бросает StateError, если элемент не найден
+      await _commandCharacteristic!.write(
+        bytesToSend,
+        withoutResponse: false,
+      ); // Убедитесь, что withoutResponse правильный
       log(
-        'Characteristic $characteristicId not found in service ${service.uuid}. Error: $e',
+        '${operationDescription ?? messageType} sent. Awaiting notification for confirmation.',
       );
-      return null;
+      _feedbackController.add(
+        BleFeedback(
+          status: BleOperationStatus.commandSent,
+          message: '${operationDescription ?? messageType} sent.',
+        ),
+      );
+    } catch (e) {
+      log('Error writing command: $e');
+      _feedbackController.add(
+        BleFeedback(
+          status: BleOperationStatus.error,
+          message: 'Failed to send command: $e',
+        ),
+      );
+      rethrow;
     }
   }
 
+  // _resetState (без изменений)
+  Future<void> _resetState({bool notify = true, String? reason}) async {
+    log('Resetting BlueManager state. Reason: ${reason ?? "N/A"}');
+    _isInitialized = false;
+    _isInitializing = false;
+    await _notificationSubscription?.cancel();
+    _notificationSubscription = null;
+    await _connectionStateSubscription?.cancel();
+    _connectionStateSubscription = null;
+    if (_targetDevice != null && _targetDevice!.isConnected) {
+      try {
+        await _targetDevice!.disconnect();
+        log('Disconnected from ${_targetDevice!.platformName} during reset.');
+      } catch (e) {
+        log('Error disconnecting during reset: $e');
+      }
+    }
+    _targetDevice = null;
+    _tokenCharacteristic = null;
+    _commandCharacteristic = null;
+    if (notify && !_feedbackController.isClosed) {
+      _feedbackController.add(
+        BleFeedback(
+          status: BleOperationStatus.idle,
+          message: "State reset. ${reason ?? ""}",
+        ),
+      );
+    }
+  }
+
+  // --- Public API Methods ---
+  // ИЗМЕНЕНЫ для отправки конкретных Protobuf сообщений
+
+  Future<void> turnLightOn() async {
+    final command = SetState()..state = States.LightOn;
+    await _sendCommand(command, operationDescription: 'Turn Light On');
+  }
+
+  Future<void> turnLightOff() async {
+    final command = SetState()..state = States.LightOff;
+    await _sendCommand(command, operationDescription: 'Turn Light Off');
+  }
+
+  Future<void> openDoor() async {
+    final command = SetState()..state = States.DoorLockOpen;
+    await _sendCommand(command, operationDescription: 'Open Door');
+  }
+
+  Future<void> closeDoor() async {
+    final command = SetState()..state = States.DoorLockClose;
+    await _sendCommand(command, operationDescription: 'Close Door');
+  }
+
+  Future<void> getDeviceState() async {
+    final command = GetState(); // Пустое сообщение
+    await _sendCommand(command, operationDescription: 'Get Device State');
+  }
+
+  Future<void> getDeviceInfo() async {
+    final command = GetInfo(); // Пустое сообщение
+    await _sendCommand(command, operationDescription: 'Get Device Info');
+  }
+
+  // --- Protobuf Helper Methods ---
+
+  // prepareAndSendIdentifyRequest остается таким же, так как он для токена
   Uint8List prepareAndSendIdentifyRequest(String tokenValue) {
     IdentifyRequest request = IdentifyRequest()..token = tokenValue;
     Uint8List dataToSend = request.writeToBuffer();
@@ -206,292 +656,54 @@ class BlueManager {
     return dataToSend;
   }
 
-  /// Готовит сериализованные байты для ClientMessage с командой SetState.
-  ///
-  /// [stateToSet]: Значение из enum States, которое необходимо установить.
-  Uint8List prepareSetStateCommand(States stateToSet) {
-    ClientMessage clientMessage = ClientMessage();
+  // Вспомогательные методы prepare...Message больше не нужны,
+  // так как команды создаются напрямую в публичных методах.
+  // Их можно удалить или оставить для справки, если они используются где-то еще.
 
-    // ИСПРАВЛЕНИЕ: Используем переданный stateToSet
-    clientMessage.setState = SetState(state: stateToSet);
-
-    Uint8List bytesToSend = clientMessage.writeToBuffer();
-    log(
-      'Prepared ClientMessage (SetState: ${stateToSet.name}): Bytes=$bytesToSend, Size=${bytesToSend.lengthInBytes} bytes',
-    );
-    return bytesToSend;
+  // --- Cleanup ---
+  Future<void> dispose() async {
+    log('Disposing BlueManager...');
+    await _adapterStateSubscription?.cancel();
+    _adapterStateSubscription = null;
+    await _resetState(notify: false);
+    await _feedbackController.close();
+    log('BlueManager disposed.');
   }
 
-  // Вспомогательная функция для подготовки ClientMessage с GetState
-  Uint8List prepareGetStateCommandProto() {
-    // Переименовал, чтобы не конфликтовать с prepareSetStateCommand
-    ClientMessage clientMessage = ClientMessage();
-    clientMessage.getState = GetState(); // GetState - пустой тип
-    Uint8List bytesToSend = clientMessage.writeToBuffer();
-    log(
-      'Prepared ClientMessage (GetState): Bytes=$bytesToSend, Size=${bytesToSend.lengthInBytes} bytes',
-    );
-    return bytesToSend;
-  }
-
-  // В классе BlueManager
-
-  // ... (существующие функции) ...
-
-  Uint8List prepareGetStateCommand() {
-    ClientMessage clientMessage = ClientMessage();
-    clientMessage.getState = GetState(); // GetState - пустое сообщение
-
-    Uint8List bytesToSend = clientMessage.writeToBuffer();
-    log(
-      'Prepared ClientMessage (GetState): Bytes=$bytesToSend, Size=${bytesToSend.lengthInBytes} bytes',
-    );
-    return bytesToSend;
-  }
-
-  Uint8List prepareGetInfoCommand() {
-    ClientMessage clientMessage = ClientMessage();
-    clientMessage.getInfo = GetInfo(); // GetInfo - пустое сообщение
-
-    Uint8List bytesToSend = clientMessage.writeToBuffer();
-    log(
-      'Prepared ClientMessage (GetInfo): Bytes=$bytesToSend, Size=${bytesToSend.lengthInBytes} bytes',
-    );
-    return bytesToSend;
-  }
-
+  // justTestFunc (без изменений, т.к. вызывает публичные методы)
   Future<void> justTestFunc() async {
-    BluetoothDevice? device;
-    StreamSubscription<List<int>>? notificationSubscription;
-
+    log('Starting justTestFunc via BlueManager methods...');
     try {
-      log('Starting justTestFunc...');
-      // ... (поиск устройства, сервиса, характеристики токена, запись токена - без изменений) ...
-      device = await findDeviceFromName(deviceName);
-
-      if (device == null) {
-        log('Device $deviceName not found. Exiting test function.');
-        return;
-      }
-      log('Device ${device.platformName} (${device.remoteId}) found.');
-
-      final service = await findServiceFromDevice(device);
-      if (service == null) {
-        log('Service $serviceUuid not found on device. Exiting test function.');
-        return;
-      }
-      log('Service ${service.uuid} found.');
-
-      final tokenCharacteristic = findCharacteristicFromService(
-        service,
-        characteristicTokenUuid,
+      _feedbackController.add(
+        BleFeedback(status: BleOperationStatus.idle, message: "Test Started"),
       );
-      if (tokenCharacteristic == null) {
-        log(
-          'Token characteristic $characteristicTokenUuid not found. Exiting test function.',
-        );
-        return;
-      }
-      log('Token characteristic ${tokenCharacteristic.uuid} found.');
-
-      final identifyBytes = prepareAndSendIdentifyRequest(
-        "CE0HOsYGo2oS8sdF", // Пример токена
-      );
-      log('Writing token to ${tokenCharacteristic.uuid}...');
-      await tokenCharacteristic.write(identifyBytes, withoutResponse: false);
-      log('Token written successfully.');
-
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      final commandCharacteristic = findCharacteristicFromService(
-        service,
-        characteristicUuid,
-      );
-      if (commandCharacteristic == null) {
-        log(
-          'Command characteristic $characteristicUuid not found. Exiting test function.',
-        );
-        return;
-      }
-      log('Command characteristic ${commandCharacteristic.uuid} found.');
-
-      // Настройка уведомлений (остается без изменений)
-      if (commandCharacteristic.properties.notify) {
-        log(
-          'Setting notify value for command characteristic ${commandCharacteristic.uuid}...',
-        );
-        await commandCharacteristic.setNotifyValue(true);
-        log('Notify value set. Listening for notifications...');
-
-        notificationSubscription = commandCharacteristic.onValueReceived.listen(
-          (value) {
-            if (value.isEmpty) {
-              log('Notification: Received empty value.');
-              return;
-            }
-            try {
-              final decoded = ControllerResponse.fromBuffer(value);
-              log('Notification: Decoded: ${decoded.toString()}, Raw: $value');
-            } catch (e) {
-              log('Notification: Error decoding: $e. Raw value: $value');
-            }
-          },
-          onError: (error) {
-            log('Error in notification subscription: $error');
-          },
-        );
-        // Используй правильный метод для отмены подписки для твоей версии flutter_blue_plus
-        // notificationSubscription.cancelWith(device); // для новых версий
-        // device.cancelWhenDisconnected(notificationSubscription); // для старых
-        // или отменяй вручную в finally, если не уверен.
-        // В твоем коде было просто .cancel(), что не очень хорошо, т.к. отменит сразу.
-        // Оставим пока так, но имей в виду, что это отменит подписку сразу после ее создания.
-        // ЛУЧШЕ ЗАКОММЕНТИРОВАТЬ ЭТОТ CANCEL ЗДЕСЬ, И ОТМЕНЯТЬ В FINALLY ИЛИ ЧЕРЕЗ cancelWith(device)
-        // notificationSubscription.cancel(); // <--- ЭТО ОТМЕНИТ ПОДПИСКУ НЕМЕДЛЕННО!
-        log(
-          'Notification subscription configured.', // Изменено сообщение
-        );
-      } else {
-        log(
-          'Command characteristic ${commandCharacteristic.uuid} does not support notifications.',
-        );
-      }
-
-      await Future.delayed(const Duration(seconds: 1));
-
-      // --- Тестирование GET INFO (если отправляется как команда) ---
-      log('--- Testing GetInfo command ---');
-      final bytesGetInfo = prepareGetInfoCommand();
-      log('Sending GetInfo command...');
-      await commandCharacteristic.write(bytesGetInfo, withoutResponse: false);
-      log(
-        'GetInfo command sent. Check notifications for ControllerResponse.info.',
-      );
-      await Future.delayed(const Duration(seconds: 3)); // Даем время на ответ
-
-      // --- Тестирование GET STATE (если отправляется как команда) ---
-      log('--- Testing GetState command ---');
-      final bytesGetState = prepareGetStateCommand();
-      log('Sending GetState command...');
-      await commandCharacteristic.write(bytesGetState, withoutResponse: false);
-      log(
-        'GetState command sent. Check notifications for ControllerResponse.state.',
-      );
-      await Future.delayed(const Duration(seconds: 3)); // Даем время на ответ
-
-      // --- Тестирование READ характеристики (если она поддерживает read) ---
-      if (commandCharacteristic.properties.read) {
-        log(
-          '--- Testing Read characteristic ${commandCharacteristic.uuid} ---',
-        );
-        try {
-          log('Reading characteristic value...');
-          List<int> readValue = await commandCharacteristic.read();
-          log('Characteristic Read: Raw value = $readValue');
-          if (readValue.isNotEmpty) {
-            try {
-              final decoded = ControllerResponse.fromBuffer(readValue);
-              log('Characteristic Read: Decoded value = ${decoded.toString()}');
-            } catch (e) {
-              log('Characteristic Read: Error decoding read value: $e');
-            }
-          } else {
-            log('Characteristic Read: Received empty value.');
-          }
-        } catch (e) {
-          log('Error reading characteristic: $e');
-        }
-        await Future.delayed(const Duration(seconds: 3));
-      } else {
-        log(
-          'Characteristic ${commandCharacteristic.uuid} does not support read.',
-        );
-      }
-
-      // --- Тестирование SET STATE команд (остается без изменений) ---
-      log('--- Testing SetState Commands ---');
-
-      log('Sending LightOff command...');
-      final bytesLightOff = prepareSetStateCommand(States.LightOff);
-      await commandCharacteristic.write(bytesLightOff, withoutResponse: false);
-      log('LightOff command sent.');
+      await getDeviceInfo();
       await Future.delayed(const Duration(seconds: 3));
-
-      log('Sending LightOn command...');
-      final bytesLightOn = prepareSetStateCommand(States.LightOn);
-      await commandCharacteristic.write(bytesLightOn, withoutResponse: false);
-      log('LightOn command sent.');
+      await getDeviceState();
       await Future.delayed(const Duration(seconds: 3));
-
-      log('Sending DoorLockOpen command...');
-      final bytesDoorOpen = prepareSetStateCommand(States.DoorLockOpen);
-      await commandCharacteristic.write(bytesDoorOpen, withoutResponse: false);
-      log('DoorLockOpen command sent.');
+      await turnLightOff();
       await Future.delayed(const Duration(seconds: 3));
-
-      log('Sending DoorLockClose command...');
-      final bytesDoorClose = prepareSetStateCommand(States.DoorLockClose);
-      await commandCharacteristic.write(bytesDoorClose, withoutResponse: false);
-      log('DoorLockClose command sent.');
+      await turnLightOn();
       await Future.delayed(const Duration(seconds: 3));
-
-      log(
-        'Test commands sent. Waiting a bit more for any final notifications...',
+      await openDoor();
+      await Future.delayed(const Duration(seconds: 3));
+      await closeDoor();
+      await Future.delayed(const Duration(seconds: 3));
+      _feedbackController.add(
+        BleFeedback(
+          status: BleOperationStatus.idle,
+          message: "Test functions completed. Check logs and UI for feedback.",
+        ),
       );
-      await Future.delayed(const Duration(seconds: 5));
-      log('--- Finished Testing Commands ---');
+      log('--- Finished Testing Commands via BlueManager ---');
     } catch (e) {
-      // ... (обработка ошибок - без изменений) ...
-      log('!!! Critical Error in justTestFunc: $e');
-      if (e is FlutterBluePlusException) {
-        log(
-          'FlutterBluePlusException details: Code: ${e.code}, Description: ${e.description}',
-        );
-      }
-      if (e is PlatformException) {
-        log(
-          'PlatformException details: Code: ${e.code}, Message: ${e.message}, Details: ${e.details}',
-        );
-      }
-    } finally {
-      log('justTestFunc finally block executing...');
-      // Важно: отмена подписки!
-      if (notificationSubscription != null) {
-        // Если ты не используешь cancelWith(device) или device.cancelWhenDisconnected,
-        // то нужно отменить подписку здесь, чтобы избежать утечек.
-        await notificationSubscription.cancel();
-        log('Notification subscription explicitly canceled in finally.');
-      }
-
-      // ... (отключение от устройства и остановка сканирования - без изменений) ...
-      if (device != null && device.isConnected) {
-        log(
-          'Disconnecting from ${device.platformName} (${device.remoteId}) in finally block...',
-        );
-        try {
-          await device.disconnect();
-          log('Disconnected successfully.');
-        } catch (disconnectError) {
-          log('Error during disconnection: $disconnectError');
-        }
-      } else if (device != null) {
-        log(
-          'Device ${device.platformName} was found but is not connected in finally block (or already disconnected).',
-        );
-      } else {
-        log('Device was not found or initialized, no disconnection needed.');
-      }
-
-      if (FlutterBluePlus.isScanningNow) {
-        log(
-          'Stopping scan in finally block of justTestFunc (should have stopped earlier)...',
-        );
-        await FlutterBluePlus.stopScan();
-      }
-      log('Finished justTestFunc execution.');
+      log('!!! Error in justTestFunc: $e');
+      _feedbackController.add(
+        BleFeedback(
+          status: BleOperationStatus.error,
+          message: "Test failed: $e",
+        ),
+      );
     }
   }
-
-  // Свойство для получения стрима результатов сканирования, если нужно извне
-  Stream<List<ScanResult>> get scanResultsStream => FlutterBluePlus.scanResults;
 }
