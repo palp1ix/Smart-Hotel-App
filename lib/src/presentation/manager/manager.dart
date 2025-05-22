@@ -78,7 +78,7 @@ class _ManagerScreenState extends State<ManagerScreen> {
         surfaceTintColor: AppColors.background,
       ),
       body: Padding(
-        padding: const EdgeInsets.only(bottom: 70),
+        padding: const EdgeInsets.only(bottom: 60),
         child: SingleChildScrollView(
           // Outer scroll view
           child: Column(

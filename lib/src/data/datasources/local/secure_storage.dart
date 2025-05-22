@@ -1,34 +1,54 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class SecureStorage {
-  static const String _tokenKey = 'jwt_token';
+  static const String _accessTokenKey = 'accessToken';
+  static const String _refreshTokenKey = 'refreshToken';
   final FlutterSecureStorage _storage;
 
   SecureStorage({FlutterSecureStorage? storage})
     : _storage = storage ?? const FlutterSecureStorage();
 
   /// Stores the JWT token securely
-  Future<void> storeToken(String token) async {
+  Future<void> storeToken(String accessToken, String refreshToken) async {
     try {
-      await _storage.write(key: _tokenKey, value: token);
+      await _storage.write(key: _accessTokenKey, value: accessToken);
+      await _storage.write(key: _refreshTokenKey, value: refreshToken);
     } catch (e) {
       throw SecurityException('Failed to store token: $e');
     }
   }
 
   /// Retrieves the stored JWT token
-  Future<String?> getToken() async {
+  Future<String?> getAccessToken() async {
     try {
-      return await _storage.read(key: _tokenKey);
+      return await _storage.read(key: _accessTokenKey);
+    } catch (e) {
+      throw SecurityException('Failed to retrieve token: $e');
+    }
+  }
+
+  /// Retrieves the stored JWT token
+  Future<String?> getRefreshToken() async {
+    try {
+      return await _storage.read(key: _refreshTokenKey);
     } catch (e) {
       throw SecurityException('Failed to retrieve token: $e');
     }
   }
 
   /// Deletes the stored JWT token
-  Future<void> deleteToken() async {
+  Future<void> deleteAccessToken() async {
     try {
-      await _storage.delete(key: _tokenKey);
+      await _storage.delete(key: _accessTokenKey);
+    } catch (e) {
+      throw SecurityException('Failed to delete token: $e');
+    }
+  }
+
+  /// Deletes the stored JWT token
+  Future<void> deleteRefreshToken() async {
+    try {
+      await _storage.delete(key: _refreshTokenKey);
     } catch (e) {
       throw SecurityException('Failed to delete token: $e');
     }
@@ -37,7 +57,7 @@ class SecureStorage {
   /// Checks if a token exists
   Future<bool> hasToken() async {
     try {
-      final token = await getToken();
+      final token = await getAccessToken();
       return token != null && token.isNotEmpty;
     } catch (e) {
       return false;

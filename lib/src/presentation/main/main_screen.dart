@@ -4,6 +4,8 @@ import 'package:flutter/widgets.dart';
 import 'package:smart_hotel_app/core/icons/icons.dart';
 import 'package:smart_hotel_app/core/widgets/hotel_naviagtion_bar.dart';
 import 'package:smart_hotel_app/router/router.gr.dart';
+import 'package:smart_hotel_app/src/data/models/reservation/reservation.dart';
+import 'package:smart_hotel_app/src/data/models/user/user.dart';
 
 @RoutePage()
 class MainScreen extends StatelessWidget {
@@ -22,7 +24,7 @@ class MainScreen extends StatelessWidget {
         ];
         return Stack(
           children: [
-            child,
+            UserInfoWidget(child: child),
             Positioned(
               bottom: 30,
               right: 0,
@@ -42,5 +44,27 @@ class MainScreen extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+class UserInfoWidget extends InheritedWidget {
+  const UserInfoWidget({
+    super.key,
+    this.user,
+    this.reservation,
+    required super.child,
+  });
+
+  final User? user;
+  final Reservation? reservation;
+
+  static UserInfoWidget of(BuildContext context) {
+    return context.dependOnInheritedWidgetOfExactType<UserInfoWidget>()!;
+  }
+
+  @override
+  bool updateShouldNotify(UserInfoWidget oldWidget) {
+    return reservation?.apartmentId != oldWidget.reservation?.apartmentId ||
+        user?.email != oldWidget.user?.email;
   }
 }

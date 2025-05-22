@@ -48,15 +48,18 @@ class QuickActionContainer extends StatelessWidget {
                     color:
                         isSelected ? AppColors.onMain : AppColors.onContainer,
                   ),
-                  child: SvgPicture.asset(
-                    width: 23,
-                    height: 23,
-                    iconPath,
-                    colorFilter: ColorFilter.mode(
-                      isSelected ? Colors.black : Colors.white,
-                      BlendMode.srcIn,
+                  child: Center(
+                    child: SvgPicture.asset(
+                      width: 23,
+                      height: 23,
+
+                      iconPath,
+                      colorFilter: ColorFilter.mode(
+                        isSelected ? Colors.black : Colors.white,
+                        BlendMode.srcIn,
+                      ),
+                      fit: BoxFit.scaleDown, // Добавлено свойство fit
                     ),
-                    fit: BoxFit.scaleDown, // Добавлено свойство fit
                   ),
                 ),
               ),

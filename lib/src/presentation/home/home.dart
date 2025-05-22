@@ -1,7 +1,8 @@
-import 'package:auto_route/annotations.dart';
+import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get_it/get_it.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:smart_hotel_app/core/colors/colors.dart';
 // Assuming getGeistText is defined in fonts.dart or widgets.dart
 // If it's in fonts.dart:
@@ -9,18 +10,27 @@ import 'package:smart_hotel_app/core/fonts/fonts.dart';
 // If it's in widgets.dart (and re-exports fonts or defines it directly):
 import 'package:smart_hotel_app/core/widgets/widgets.dart';
 import 'package:smart_hotel_app/core/widgets/hotel_structure_widget.dart';
+import 'package:smart_hotel_app/managers/auth_service.dart';
+import 'package:smart_hotel_app/managers/backend_service.dart';
 import 'package:smart_hotel_app/managers/blue_manager.dart';
+import 'package:smart_hotel_app/router/router.gr.dart';
+import 'package:smart_hotel_app/src/data/models/reservation/reservation.dart';
+import 'package:smart_hotel_app/src/data/models/user/user.dart';
 import 'package:smart_hotel_app/src/presentation/home/widgets/quick_action.dart';
 
 @RoutePage()
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, this.user, this.reservation});
+
+  final User? user;
+  final Reservation? reservation;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  late final User _currentUser;
   final _listScenes = {
     'Reading': 'assets/icons/book.svg',
     'Relax': 'assets/icons/bed.svg',
@@ -32,11 +42,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   bool isSelected = false;
 
+  bool isDoorClosed = true;
+
   int _selectedItemIndex = -1;
 
   @override
   void initState() {
     super.initState();
+    final authService = AuthService();
+    _currentUser = authService.currentUser ?? User(email: 'email@com');
   }
 
   @override
@@ -56,9 +70,22 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       ),
       QuickActionModel(
+        title: 'Generate link',
+        subtitle: 'Link for open door',
+        iconPath: 'assets/icons/link.svg',
+        onTap: () async {
+          final backendService = BackendService();
+          final link = await backendService.generateLink();
+          if (link != null) {
+            await Share.shareUri(Uri.parse(link));
+          }
+        },
+      ),
+      QuickActionModel(
         title: 'Manage room',
         subtitle: '204',
         iconPath: 'assets/icons/arrow.up.rightsvg.svg',
+        onTap: () => AutoTabsRouter.of(context).setActiveIndex(1),
       ),
       QuickActionModel(
         title: 'Sound',
@@ -92,24 +119,60 @@ class _HomeScreenState extends State<HomeScreen> {
                     color: AppColors.main,
                     size: 24,
                   ),
+                  Spacer(),
+                  GestureDetector(
+                    onTap: () async {
+                      final authManager = AuthService();
+                      await authManager.signOut();
+                      context.router.replace(LoginRoute());
+                    },
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.secondContainer,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(10.0),
+                        child: SvgPicture.asset(
+                          'assets/icons/minus.svg',
+                          width: 20,
+                          height: 20,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 10),
                 ],
               ),
               SizedBox(height: 20),
               UserInfoCard(
                 userInfo: UserInfo(
-                  name: 'Kim',
-                  surname: 'Kardashian',
+                  name: _currentUser.firstName ?? "John",
+                  surname: _currentUser.lastName ?? 'Wickendov',
                   temperature: 30.2,
-                  doorClosed: true,
+                  doorClosed: isDoorClosed,
                   room: '204',
                 ),
+                onTap: () {
+                  setState(() {
+                    isDoorClosed = !isDoorClosed;
+                  });
+                },
               ),
               SizedBox(height: 30),
               SizedBox(
                 height: 171,
                 child: HotelStructureWidget(
                   title: 'Quick Actions',
-                  trailing: HotelTextButton(onPressed: () {}, text: 'See all'),
+                  trailing: HotelTextButton(
+                    onPressed: () {
+                      context.router.push(LoadingRoute());
+                    },
+                    text: 'See all',
+                  ),
                   child: SizedBox(
                     height: 120,
                     child: ListView.builder(
@@ -139,7 +202,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 height: 300,
                 child: HotelStructureWidget(
                   title: 'Scenes',
-                  trailing: HotelTextButton(onPressed: () {}, text: 'See all'),
+                  trailing: HotelTextButton(
+                    onPressed: () {
+                      context.router.push(LoadingRoute());
+                    },
+                    text: 'See all',
+                  ),
                   child: GridView.builder(
                     physics: NeverScrollableScrollPhysics(),
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -184,9 +252,10 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 class UserInfoCard extends StatelessWidget {
-  const UserInfoCard({super.key, required this.userInfo});
+  const UserInfoCard({super.key, required this.userInfo, this.onTap});
 
   final UserInfo userInfo;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -216,7 +285,7 @@ class UserInfoCard extends StatelessWidget {
                     label:
                         'Name', // As per original code, consider changing to 'Surname'
                   ),
-                  SizedBox(width: 40),
+                  SizedBox(width: 30),
                   InfoItemWidget(
                     value: userInfo.room,
                     label: 'Room ',
@@ -250,8 +319,11 @@ class UserInfoCard extends StatelessWidget {
                 onTap: () async {
                   try {
                     final blueManager = GetIt.I<BlueManager>();
-                    await blueManager.openDoor();
+                    userInfo.doorClosed
+                        ? await blueManager.openDoor()
+                        : await blueManager.closeDoor();
                   } catch (e) {}
+                  onTap?.call();
                 },
                 child: Container(
                   decoration: BoxDecoration(
@@ -259,11 +331,15 @@ class UserInfoCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(15),
                   ),
                   width: double.infinity,
-                  height: 55,
+                  height: 48,
                   child: Row(
                     children: [
                       SizedBox(width: 20),
-                      getGeistText('Open door', weight: 600, size: 17),
+                      getGeistText(
+                        userInfo.doorClosed ? 'Open door' : 'Close door',
+                        weight: 600,
+                        size: 17,
+                      ),
                       Spacer(),
                       Container(
                         margin: EdgeInsets.all(4),

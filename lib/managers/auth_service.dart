@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:developer';
+import 'package:dio/dio.dart';
+import 'package:get_it/get_it.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 import 'package:smart_hotel_app/src/data/datasources/local/secure_storage.dart';
-import 'package:smart_hotel_app/src/data/models/user.dart';
+import 'package:smart_hotel_app/src/data/models/user/user.dart';
 
 class AuthService {
   // Singleton instance
@@ -27,15 +29,15 @@ class AuthService {
   User? get currentUser => _currentUser;
   bool isAuntificated = false;
 
-  int? _companyId(String? token) {
+  int _userId(String? token) {
     if (token == null) {
-      return null;
+      throw Exception('Token is null');
     }
     Map<String, dynamic> decodedToken = JwtDecoder.decode(token);
     return decodedToken['sub'] as int;
   }
 
-  Future<int?> get companyId async => _companyId(await storage.getToken());
+  Future<int> get userId async => _userId(await storage.getAccessToken());
 
   Future<void> saveJwt() {
     return Future.delayed(const Duration(seconds: 1));
@@ -43,9 +45,10 @@ class AuthService {
 
   Future<String?> initializeUser() async {
     try {
-      final token = await storage.getToken();
+      final token = await storage.getAccessToken();
       if (token != null) {
         isAuntificated = true;
+        _authStateController.add(_currentUser);
       }
       return token;
     } catch (e) {
@@ -54,13 +57,28 @@ class AuthService {
   }
 
   // Sign in with email and password
-  Future<void> signInWithUser(User user, String token) async {
+  Future<void> signInWithUser(
+    User user,
+    String accessToken,
+    String refreshToken,
+  ) async {
     try {
       _currentUser = user;
       isAuntificated = true;
       _authStateController.add(_currentUser);
 
-      await storage.storeToken(token);
+      final dio = GetIt.I<Dio>();
+      dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            options.headers['Authorization'] = 'Bearer $accessToken';
+            handler.next(options);
+          },
+        ),
+      );
+
+      log('Token added to header');
+      await storage.storeToken(accessToken, refreshToken);
     } catch (e) {
       throw AuthException('Failed to sign in: $e');
     }
@@ -73,7 +91,7 @@ class AuthService {
       _currentUser = null;
       _authStateController.add(null);
       final storage = SecureStorage();
-      await storage.deleteToken();
+      await storage.deleteAccessToken();
     } catch (e) {
       throw AuthException('Failed to sign out: $e');
     }
