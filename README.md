@@ -83,13 +83,13 @@ lib/
 
 | Screen # | Description              | Image Placeholder            |
 | -------- | ------------------------ | ---------------------------- |
-| 1        | App Launch Screen        | ![](app_screens/screen1.png) |
-| 2        | Room Unlock via BLE      | ![](app_screens/screen2.png) |
-| 3        | Room Environment Control | ![](app_screens/screen3.png) |
-| 4        | Room Service Menu        | ![](app_screens/screen4.png) |
-| 5        | BLE Device Scanner       | ![](app_screens/screen5.png) |
-| 6        | Indoor Navigation UI     | ![](app_screens/screen6.png) |
-| 7        | Settings and Permissions | ![](app_screens/screen7.png) |
+| 1        | Login       | ![](app_screens/screen1.png) |
+| 2        | Registration      | ![](app_screens/screen2.png) |
+| 3        | Reservation | ![](app_screens/screen3.png) |
+| 4        | Date time picker       | ![](app_screens/screen4.png) |
+| 5        | Home Screen       | ![](app_screens/screen5.png) |
+| 6        | Manage room screen     | ![](app_screens/screen6.png) |
+| 7        | Restaurant | ![](app_screens/screen7.png) |
 
 ---
 
